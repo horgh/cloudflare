@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/miekg/dns"
 	"summercat.com/cloudflare"
 	"summercat.com/icanhazip"
 )
@@ -66,20 +68,23 @@ func main() {
 
 	// We only want to make an update if there is a difference.
 	// To know the current IP, look up its A record.
-	currentIPs, err := net.LookupIP(args.Hostname)
+	ips, err := dnsLookupHost(args.Hostname)
 	if err != nil {
-		log.Fatalf("Unable to look up A records: %s", err)
+		log.Fatal(err)
 	}
 
-	if len(currentIPs) == 0 {
+	if len(ips) == 0 {
 		log.Fatalf("Unable to determine current record IP via DNS. No IPs found.")
 	}
 
-	if len(currentIPs) > 1 {
-		log.Fatalf("There are %d A records. Unable to update.", len(currentIPs))
+	if len(ips) > 1 {
+		log.Fatalf("There are %d A records. Unable to update.", len(ips))
 	}
 
-	currentIP := currentIPs[0]
+	currentIP := ips[0]
+	if args.Verbose {
+		log.Printf("Host's current IP is %s", currentIP)
+	}
 
 	if currentIP.Equal(ip) {
 		if args.Verbose {
@@ -161,6 +166,78 @@ func getKeyFromFile(keyFile string) (string, error) {
 	}
 
 	return key, nil
+}
+
+// I'm using github.com/miekg/dns as using the standard library net package
+// always uses the local resolver. Doing so presents a problem when the host
+// we want to look up is the local server's hostname as that means we will get
+// back 127.0.1.1, at least in Debian/Ubuntu.
+func dnsLookupHost(host string) ([]net.IP, error) {
+	nameserver, err := getNameserver()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to determine a nameserver: %s", err)
+	}
+
+	msg := new(dns.Msg)
+	msg.Id = dns.Id()
+	msg.RecursionDesired = true
+	msg.Question = make([]dns.Question, 1)
+	msg.Question[0] = dns.Question{
+		Name:   dns.Fqdn(host),
+		Qtype:  dns.TypeA,
+		Qclass: dns.ClassINET,
+	}
+
+	// Send query.
+	in, err := dns.Exchange(msg, fmt.Sprintf("%s:53", nameserver))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to perform lookup: %s", err)
+	}
+
+	if in.Rcode != dns.RcodeSuccess {
+		return nil, fmt.Errorf("Lookup problem: %s", dns.RcodeToString[in.Rcode])
+	}
+
+	ips := []net.IP{}
+	for _, record := range in.Answer {
+		ip, ok := record.(*dns.A)
+		if !ok {
+			continue
+		}
+		ips = append(ips, ip.A)
+	}
+
+	return ips, nil
+}
+
+// Retrieve the first nameserver from /etc/resolv.conf
+func getNameserver() (string, error) {
+	fh, err := os.Open("/etc/resolv.conf")
+	if err != nil {
+		return "", err
+	}
+	defer fh.Close()
+
+	scanner := bufio.NewScanner(fh)
+
+	for scanner.Scan() {
+		text := strings.TrimSpace(scanner.Text())
+		if len(text) == 0 || text[0] == '#' {
+			continue
+		}
+
+		pieces := strings.Split(text, " ")
+		if len(pieces) == 2 && pieces[0] == "nameserver" {
+			return pieces[1], nil
+		}
+	}
+
+	err = scanner.Err()
+	if err != nil {
+		return "", fmt.Errorf("Scan error: %s", err)
+	}
+
+	return "", fmt.Errorf("No resolver found")
 }
 
 func updateIP(key, email, domain, hostname string, verbose bool,
