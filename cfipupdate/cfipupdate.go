@@ -11,9 +11,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/horgh/cloudflare"
+	"github.com/horgh/icanhazip"
 	"github.com/miekg/dns"
-	"summercat.com/cloudflare"
-	"summercat.com/icanhazip"
 )
 
 // Args are command line arguments.
