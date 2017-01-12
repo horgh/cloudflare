@@ -1,5 +1,4 @@
-// Package cloudflare provides a basic wrapper around Cloudflare's API. Right
-// now I am mainly interested in the DNS related calls.
+// Package cloudflare provides a basic wrapper around Cloudflare's API.
 package cloudflare
 
 import (
