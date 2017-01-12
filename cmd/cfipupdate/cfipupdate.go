@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -36,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	key, err := getKeyFromFile(args.KeyFile)
+	key, err := cloudflare.ReadKeyFromFile(args.KeyFile)
 	if err != nil {
 		log.Fatalf("Unable to read key: %s", err)
 	}
@@ -102,12 +101,12 @@ func main() {
 }
 
 func getArgs() (Args, error) {
-	email := flag.String("email", "", "Email address on your CloudFlare account.")
+	email := flag.String("email", "", "Email address on your Cloudflare account.")
 	domain := flag.String("domain", "", "Domain involved in the update.")
 	hostname := flag.String("hostname", "", "Hostname to update.")
 	keyFile := flag.String("key-file", "", "Path to file containing API key. The file should contain nothing but your key.")
 	ipString := flag.String("ip", "", "IP to set. If you don't provide this, then we query icanhazip.com for your current IP.")
-	onlyIfDifferent := flag.Bool("only-if-different", false, "If true, we check the current IP of the host via DNS, and only contact the CloudFlare API if it does not match the IP you provided (or we found as current).")
+	onlyIfDifferent := flag.Bool("only-if-different", false, "If true, we check the current IP of the host via DNS, and only contact the Cloudflare API if it does not match the IP you provided (or we found as current).")
 	verbose := flag.Bool("verbose", false, "Toggle verbose output.")
 
 	flag.Parse()
@@ -145,32 +144,6 @@ func getArgs() (Args, error) {
 		OnlyIfDifferent: *onlyIfDifferent,
 		Verbose:         *verbose,
 	}, nil
-}
-
-func getKeyFromFile(keyFile string) (string, error) {
-	fh, err := os.Open(keyFile)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		err := fh.Close()
-		if err != nil {
-			log.Printf("close: %s: %s", keyFile, err)
-		}
-	}()
-
-	content, err := ioutil.ReadAll(fh)
-	if err != nil {
-		return "", fmt.Errorf("problem reading from file: %s", err)
-	}
-
-	key := strings.TrimSpace(string(content))
-
-	if len(key) == 0 {
-		return "", fmt.Errorf("no key found in file")
-	}
-
-	return key, nil
 }
 
 // I'm using github.com/miekg/dns as using the standard library net package

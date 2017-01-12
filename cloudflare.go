@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -23,6 +26,9 @@ type Client struct {
 
 	// Email is the email on your account
 	Email string
+
+	// Enable debug output.
+	Debug bool
 
 	httpClient *http.Client
 }
@@ -118,14 +124,18 @@ func (c Client) request(method, url string, bodyReader io.Reader) ([]byte,
 
 // ListZones makes an API request to list zones.
 //
+// A Zone is a domain name. Each has a unique identifier that we may use in
+// other API requests.
+//
 // Parameters:
-// name - domain name
+// name - domain name. Blank to not specify.
 // status - May be blank. If so, it defaults to active.
-// page - Which page (pagination)
-// perPage - How many per page (max 50, min 5)
-// order - name, status, email.
-// direction - Ordering of listed zones (asc, desc)
-// match - Match all search requirements or any (any, all)
+// page - Which page (pagination). Negative/zero to default to 1.
+// perPage - How many per page (max 50, min 5). Negative/zero to default to 20.
+// order - name, status, email. Leave blank to not specify.
+// direction - Ordering of listed zones (asc, desc). Leave blank to not specify.
+// match - Match all search requirements or any (any, all). Leave blank to
+//   default to all.
 //
 // Any string parameter, if blank, will use the default. Any integer parameter
 // if negative will use the default.
@@ -294,6 +304,83 @@ func (c Client) UpdateDNSRecord(record DNSRecord) error {
 	}
 
 	return nil
+}
+
+// PurgeAllFiles purges all of the files from Cloudflare's cache for the
+// given zone.
+//
+// To find the zone ID, refer to ListAllZone().
+func (c Client) PurgeAllFiles(zoneID string) error {
+	if zoneID == "" {
+		return fmt.Errorf("you must provide a zone ID")
+	}
+
+	type PurgePayload struct {
+		PurgeEverything bool `json:"purge_everything"`
+	}
+
+	payload := PurgePayload{PurgeEverything: true}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("unable to build JSON: %s", err)
+	}
+
+	url := fmt.Sprintf("%szones/%s/purge_cache", endpoint,
+		url.QueryEscape(zoneID))
+
+	bodyReader := bytes.NewReader(jsonPayload)
+
+	body, err := c.request("DELETE", url, bodyReader)
+	if err != nil {
+		return fmt.Errorf("API request failure: %s", err)
+	}
+
+	var response Response
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return fmt.Errorf("JSON decoding problem: %s: %s", err, body)
+	}
+
+	if c.Debug {
+		log.Printf("%v", response)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("purge error: %s. Payload: %s",
+			errorsToError(response.Errors), jsonPayload)
+	}
+
+	return nil
+}
+
+// ReadKeyFromFile reads an API key from a given file.
+//
+// The file should contain nothing other than the API key.
+func ReadKeyFromFile(keyFile string) (string, error) {
+	fh, err := os.Open(keyFile)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		err := fh.Close()
+		if err != nil {
+			log.Printf("close: %s: %s", keyFile, err)
+		}
+	}()
+
+	content, err := ioutil.ReadAll(fh)
+	if err != nil {
+		return "", fmt.Errorf("problem reading from file: %s", err)
+	}
+
+	key := strings.TrimSpace(string(content))
+
+	if len(key) == 0 {
+		return "", fmt.Errorf("no key found in file")
+	}
+
+	return key, nil
 }
 
 // We can get back multiple errors from the API. Concatenate them together
