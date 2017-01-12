@@ -1,4 +1,4 @@
-// Package cloudflare provides a basic wrapper around CloudFlare's API. Right
+// Package cloudflare provides a basic wrapper around Cloudflare's API. Right
 // now I am mainly interested in the DNS related calls.
 package cloudflare
 
@@ -92,7 +92,7 @@ func (c Client) request(method, url string, bodyReader io.Reader) ([]byte,
 	error) {
 	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create request: %s", err)
+		return nil, fmt.Errorf("unable to create request: %s", err)
 	}
 
 	req.Header.Set("X-Auth-Email", c.Email)
@@ -101,16 +101,16 @@ func (c Client) request(method, url string, bodyReader io.Reader) ([]byte,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Request problem: %s", err)
+		return nil, fmt.Errorf("request problem: %s", err)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	err2 := resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read body: %s", err)
+		return nil, fmt.Errorf("unable to read body: %s", err)
 	}
 	if err2 != nil {
-		return nil, fmt.Errorf("Problem closing body: %s", err2)
+		return nil, fmt.Errorf("problem closing body: %s", err2)
 	}
 
 	return body, nil
@@ -177,7 +177,7 @@ func (c Client) ListZones(name, status string, page, perPage int,
 	}
 
 	if !zoneResponse.Success {
-		return nil, fmt.Errorf("List zone error: %s",
+		return nil, fmt.Errorf("list zone error: %s",
 			errorsToError(zoneResponse.Errors))
 	}
 
@@ -203,7 +203,7 @@ func (c Client) ListZones(name, status string, page, perPage int,
 func (c Client) ListDNSRecords(zoneID, recordType, name, content string, page,
 	perPage int, order, direction, match string) ([]DNSRecord, error) {
 	if len(zoneID) == 0 {
-		return nil, fmt.Errorf("You must provide a zone ID. Use ListZones() to find one.")
+		return nil, fmt.Errorf("you must provide a zone ID. Use ListZones() to find one")
 	}
 
 	values := url.Values{}
@@ -247,7 +247,7 @@ func (c Client) ListDNSRecords(zoneID, recordType, name, content string, page,
 	}
 
 	if !dnsResponse.Success {
-		return nil, fmt.Errorf("List DNS records error: %s",
+		return nil, fmt.Errorf("list DNS records error: %s",
 			errorsToError(dnsResponse.Errors))
 	}
 
@@ -269,7 +269,7 @@ func (c Client) ListDNSRecords(zoneID, recordType, name, content string, page,
 func (c Client) UpdateDNSRecord(record DNSRecord) error {
 	jsonPayload, err := json.Marshal(record)
 	if err != nil {
-		return fmt.Errorf("Unable to encode to JSON: %s", err)
+		return fmt.Errorf("unable to encode to JSON: %s", err)
 	}
 
 	url := fmt.Sprintf("%szones/%s/dns_records/%s", endpoint,
@@ -289,7 +289,7 @@ func (c Client) UpdateDNSRecord(record DNSRecord) error {
 	}
 
 	if !response.Success {
-		return fmt.Errorf("Update DNS record error: %s. Payload: %s",
+		return fmt.Errorf("update DNS record error: %s. Payload: %s",
 			errorsToError(response.Errors), jsonPayload)
 	}
 

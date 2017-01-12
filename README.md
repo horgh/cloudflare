@@ -1,5 +1,5 @@
 This repository contains a package for interacting with the
-[CloudFlare](https://www.cloudflare.com) API.
+[Cloudflare](https://www.cloudflare.com) API.
 
 Right now I am focused on DNS record updates, so I've included the API requests
 for this purpose only.

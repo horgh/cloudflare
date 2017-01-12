@@ -1,4 +1,4 @@
-// This program makes a CloudFlare API request to update an A record IP.
+// This program makes a Cloudflare API request to update an A record IP.
 package main
 
 import (
@@ -113,26 +113,26 @@ func getArgs() (Args, error) {
 	flag.Parse()
 
 	if len(*email) == 0 {
-		return Args{}, fmt.Errorf("You must provide an email.")
+		return Args{}, fmt.Errorf("you must provide an email")
 	}
 
 	if len(*domain) == 0 {
-		return Args{}, fmt.Errorf("You must provide a domain.")
+		return Args{}, fmt.Errorf("you must provide a domain")
 	}
 
 	if len(*hostname) == 0 {
-		return Args{}, fmt.Errorf("You must provide a hostname.")
+		return Args{}, fmt.Errorf("you must provide a hostname")
 	}
 
 	if len(*keyFile) == 0 {
-		return Args{}, fmt.Errorf("You must provide an API key file.")
+		return Args{}, fmt.Errorf("you must provide an API key file")
 	}
 
 	var ip net.IP
 	if len(*ipString) > 0 {
 		ip = net.ParseIP(*ipString)
 		if ip == nil {
-			return Args{}, fmt.Errorf("Invalid IP address.")
+			return Args{}, fmt.Errorf("invalid IP address")
 		}
 	}
 
@@ -152,17 +152,22 @@ func getKeyFromFile(keyFile string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer fh.Close()
+	defer func() {
+		err := fh.Close()
+		if err != nil {
+			log.Printf("close: %s: %s", keyFile, err)
+		}
+	}()
 
 	content, err := ioutil.ReadAll(fh)
 	if err != nil {
-		return "", fmt.Errorf("Problem reading from file: %s", err)
+		return "", fmt.Errorf("problem reading from file: %s", err)
 	}
 
 	key := strings.TrimSpace(string(content))
 
 	if len(key) == 0 {
-		return "", fmt.Errorf("No key found in file.")
+		return "", fmt.Errorf("no key found in file")
 	}
 
 	return key, nil
@@ -175,7 +180,7 @@ func getKeyFromFile(keyFile string) (string, error) {
 func dnsLookupHost(host string) ([]net.IP, error) {
 	nameserver, err := getNameserver()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to determine a nameserver: %s", err)
+		return nil, fmt.Errorf("unable to determine a nameserver: %s", err)
 	}
 
 	msg := new(dns.Msg)
@@ -191,11 +196,11 @@ func dnsLookupHost(host string) ([]net.IP, error) {
 	// Send query.
 	in, err := dns.Exchange(msg, fmt.Sprintf("%s:53", nameserver))
 	if err != nil {
-		return nil, fmt.Errorf("Unable to perform lookup: %s", err)
+		return nil, fmt.Errorf("unable to perform lookup: %s", err)
 	}
 
 	if in.Rcode != dns.RcodeSuccess {
-		return nil, fmt.Errorf("Lookup problem: %s", dns.RcodeToString[in.Rcode])
+		return nil, fmt.Errorf("lookup problem: %s", dns.RcodeToString[in.Rcode])
 	}
 
 	ips := []net.IP{}
@@ -216,7 +221,12 @@ func getNameserver() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer fh.Close()
+	defer func() {
+		err := fh.Close()
+		if err != nil {
+			log.Printf("close: %s: %s", "/etc/resolv.conf", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(fh)
 
@@ -234,10 +244,10 @@ func getNameserver() (string, error) {
 
 	err = scanner.Err()
 	if err != nil {
-		return "", fmt.Errorf("Scan error: %s", err)
+		return "", fmt.Errorf("scan error: %s", err)
 	}
 
-	return "", fmt.Errorf("No resolver found")
+	return "", fmt.Errorf("no resolver found")
 }
 
 func updateIP(key, email, domain, hostname string, verbose bool,
@@ -246,7 +256,7 @@ func updateIP(key, email, domain, hostname string, verbose bool,
 
 	zones, err := client.ListZones(domain, "", -1, -1, "", "", "")
 	if err != nil {
-		return fmt.Errorf("Unable to list zones: %s", err)
+		return fmt.Errorf("unable to list zones: %s", err)
 	}
 
 	// This program is specifically for updating A records.
@@ -263,7 +273,7 @@ func updateIP(key, email, domain, hostname string, verbose bool,
 		records, err := client.ListDNSRecords(zone.ID, recordType, hostname,
 			"", -1, -1, "", "", "")
 		if err != nil {
-			return fmt.Errorf("Unable to list DNS records: %s", err)
+			return fmt.Errorf("unable to list DNS records: %s", err)
 		}
 
 		for _, record := range records {
@@ -277,11 +287,11 @@ func updateIP(key, email, domain, hostname string, verbose bool,
 	}
 
 	if len(matchingRecords) == 0 {
-		return fmt.Errorf("Record not found. No update performed.")
+		return fmt.Errorf("record not found. No update performed")
 	}
 
 	if len(matchingRecords) > 1 {
-		return fmt.Errorf("Multiple matching records found. Unable to perform update.")
+		return fmt.Errorf("multiple matching records found. Unable to perform update")
 	}
 
 	record := matchingRecords[0]
@@ -299,7 +309,7 @@ func updateIP(key, email, domain, hostname string, verbose bool,
 
 	err = client.UpdateDNSRecord(record)
 	if err != nil {
-		return fmt.Errorf("Unable to update DNS record: %s", err)
+		return fmt.Errorf("unable to update DNS record: %s", err)
 	}
 
 	log.Printf("Updated A record of [%s] to IP [%s]", hostname, ip.String())
