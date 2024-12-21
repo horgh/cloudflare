@@ -66,7 +66,13 @@ func main() {
 func getArgs() (Args, error) {
 	email := flag.String("email", "", "Email address on your Cloudflare account.")
 	domain := flag.String("domain", "", "Domain involved in the update.")
-	keyFile := flag.String("key-file", "", "Path to file containing API key. The file should contain nothing but your key.")
+
+	keyFile := flag.String(
+		"key-file",
+		"",
+		"Path to file containing API key. The file should contain nothing but your key. This is under Profile -> API Tokens -> API Keys.",
+	)
+
 	verbose := flag.Bool("verbose", false, "Toggle verbose output.")
 
 	flag.Parse()
